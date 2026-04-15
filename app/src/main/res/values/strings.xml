@@ -1,3 +1,8 @@
 <resources>
-    <string name="app_name">xstreamly</string>
+    <string name="app_name">XStreamly</string>
+    <string name="title_home">Home</string>
+    <string name="title_local_media">Local Media</string>
+    <string name="title_go_live">Go Live</string>
+    <string name="title_premiere">Premiere</string>
+    <string name="action_dark_mode">Dark mode</string>
 </resources>
