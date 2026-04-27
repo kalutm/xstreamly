@@ -11,6 +11,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -20,7 +21,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 fun HomeScreen(
     viewModel: HomeViewModel = viewModel()
 ) {
-    val state = viewModel.uiState.collectAsStateWithLifecycle().value
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     when {
         state.isLoading -> {
@@ -34,7 +35,7 @@ fun HomeScreen(
 
         state.errorMessage != null -> {
             Text(
-                text = state.errorMessage,
+                text = state.errorMessage.toString(),
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.padding(24.dp)
             )

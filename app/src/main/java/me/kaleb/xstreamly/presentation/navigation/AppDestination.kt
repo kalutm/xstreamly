@@ -6,4 +6,3 @@ sealed class AppDestination(val route: String) {
     data object GoLive : AppDestination("go_live")
     data object Premiere : AppDestination("premiere")
 }
-

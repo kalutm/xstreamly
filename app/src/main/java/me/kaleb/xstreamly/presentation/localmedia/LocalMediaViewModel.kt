@@ -15,26 +15,26 @@ class LocalMediaViewModel : ViewModel() {
     private val query = MutableStateFlow("")
 
     val uiState = combine(
-        repository.observeVideoTitles(),
-        repository.observeAudioTitles(),
+        repository.observeVideos(),
+        repository.observeAudios(),
         query
     ) { videos, audios, currentQuery ->
         val normalized = currentQuery.trim()
         val filteredVideos = if (normalized.isBlank()) {
             videos
         } else {
-            videos.filter { it.contains(normalized, ignoreCase = true) }
+            videos.filter { it.title.contains(normalized, ignoreCase = true) }
         }
         val filteredAudios = if (normalized.isBlank()) {
             audios
         } else {
-            audios.filter { it.contains(normalized, ignoreCase = true) }
+            audios.filter { it.title.contains(normalized, ignoreCase = true) }
         }
 
         LocalMediaUiState(
             isLoading = false,
-            videoTitles = filteredVideos,
-            audioTitles = filteredAudios,
+            videos = filteredVideos,
+            audios = filteredAudios,
             query = currentQuery
         )
     }.stateIn(
