@@ -1,6 +1,7 @@
 package me.kaleb.xstreamly.presentation.localmedia
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -18,9 +19,20 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.annotation.RequiresApi
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDp
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.updateTransition
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import java.time.format.TextStyle
 
 @Composable
 fun LocalMediaScreen(
@@ -48,29 +60,47 @@ fun LocalMediaScreen(
             storageGranted
         }
 
-        // Determine rationale vs permanent denial
+        // Determine whether we should show rationale or treat as permanently denied
         if (!hasPermission) {
+
+            // We only enter this block if at least one required permission was denied.
+            // Now we need to decide: Should we show explanation (rationale) or tell user to go to Settings?
+
             val needsRationale = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                (result[Manifest.permission.READ_MEDIA_VIDEO] == false ||
-                        result[Manifest.permission.READ_MEDIA_AUDIO] == false) &&
-                        (context as? android.app.Activity)?.let { activity ->
-                            ActivityCompat.shouldShowRequestPermissionRationale(
-                                activity, Manifest.permission.READ_MEDIA_VIDEO
-                            ) || ActivityCompat.shouldShowRequestPermissionRationale(
-                                activity, Manifest.permission.READ_MEDIA_AUDIO
-                            )
-                        } ?: false
+
+                // For Android 13+: We requested TWO permissions (VIDEO + AUDIO)
+                // We should show rationale if:
+                //   1. At least one permission was denied in this request, AND
+                //   2. The system says we can still ask again (shouldShowRequestPermissionRationale = true)
+
+                val shouldShowExplanation = (context as? android.app.Activity)?.let { activity ->
+                    // Check if we should explain for VIDEO permission
+                    ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.READ_MEDIA_VIDEO) ||
+                            // OR check if we should explain for AUDIO permission
+                            ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.READ_MEDIA_AUDIO)
+                } ?: false
+
+                shouldShowExplanation
+
             } else {
+                // For Android 12 and below: We only requested one permission (READ_EXTERNAL_STORAGE)
+                // Since we're already inside !hasPermission, we know it was denied.
+                // So we just need to check if we should show rationale.
+
                 ActivityCompat.shouldShowRequestPermissionRationale(
                     context as? android.app.Activity ?: return@rememberLauncherForActivityResult,
                     Manifest.permission.READ_EXTERNAL_STORAGE
                 )
             }
 
+            // Final decision based on the above logic
             showRationale = needsRationale
             isPermanentlyDenied = !needsRationale
-        } else {
-            // Permission granted → reset rationale flags
+
+        }
+        else {
+            // Permission(s) were granted successfully
+            // Reset both flags so we don't show permission UI anymore
             showRationale = false
             isPermanentlyDenied = false
         }
@@ -124,7 +154,9 @@ fun LocalMediaScreen(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    item { Text("Videos", style = MaterialTheme.typography.titleMedium) }
+                    item {
+                        Text("Videos", style = MaterialTheme.typography.titleMedium)
+                    }
                     items(state.videos) { video ->
                         Text(text = video.title)
                     }
@@ -136,7 +168,6 @@ fun LocalMediaScreen(
                     items(state.audios) { video ->
                         Text(text = video.title)
                     }
-
                     if (state.videos.isEmpty() && state.audios.isEmpty()) {
                         item { Text("No local media found") }
                     }
@@ -250,6 +281,74 @@ private fun PermissionPermanentlyDeniedUI(onGoToSettingsClick: () -> Unit) {
             Spacer(Modifier.height(24.dp))
             Button(onClick = onGoToSettingsClick) {
                 Text("Open App Settings")
+            }
+        }
+    }
+}
+
+// Ui for switching button between audio and video
+@Composable
+fun SlidingSwitch(
+    options: List<String>,
+    selectedOption: String,
+    onOptionSelected: (String) -> Unit
+) {
+    val transition = updateTransition(targetState = selectedOption, label = "SwitchTransition")
+
+    // Determine which index is selected to calculate the offset
+    val selectedIndex = options.indexOf(selectedOption)
+
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0xFFF5F5F5)) // Light grey background
+            .border(1.dp, Color(0xFFE0E0E0), RoundedCornerShape(12.dp))
+            .padding(4.dp) // Inner spacing for the slider
+    ) {
+        val maxWidth = maxWidth
+        val tabWidth = maxWidth / options.size
+
+        // The Animated Sliding Background
+        val indicatorOffset by transition.animateDp(label = "Offset") { _ ->
+            tabWidth * selectedIndex
+        }
+
+        Box(
+            modifier = Modifier
+                .offset(x = indicatorOffset)
+                .width(tabWidth)
+                .fillMaxHeight()
+                .clip(RoundedCornerShape(10.dp))
+                .background(Color(0xFF1976D2)) // Blue active color
+        )
+
+        // The Clickable Labels
+        Row(modifier = Modifier.fillMaxSize()) {
+            options.forEach { option ->
+                val isSelected = option == selectedOption
+
+                // Animate text color for a smoother feel
+                val textColor by animateColorAsState(
+                    targetValue = if (isSelected) Color.White else Color.Black,
+                    animationSpec = tween(durationMillis = 300)
+                )
+
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null // Remove ripple to keep it clean
+                        ) { onOptionSelected(option) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = option,
+                    )
+                }
             }
         }
     }
