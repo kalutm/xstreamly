@@ -45,6 +45,7 @@ fun LocalMediaScreen(
     var hasPermission by remember { mutableStateOf(false) }
     var showRationale by remember { mutableStateOf(false) }
     var isPermanentlyDenied by remember { mutableStateOf(false) }
+    var isVideo by remember {mutableStateOf(false)}
 
     // Permission Launcher for multiple permissions
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -149,27 +150,36 @@ fun LocalMediaScreen(
                     label = { Text("Search local media") },
                     modifier = Modifier.fillMaxWidth()
                 )
-
+                SlidingSwitch(
+                    listOf("Audio", "Video"),
+                    if (isVideo) "Video"  else "Audio"
+                ) { selected ->
+                    isVideo = if (selected == "Video") true else false
+                }
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    item {
-                        Text("Videos", style = MaterialTheme.typography.titleMedium)
-                    }
-                    items(state.videos) { video ->
-                        Text(text = video.title)
-                    }
-
-                    item {
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                        Text("Music", style = MaterialTheme.typography.titleMedium)
-                    }
-                    items(state.audios) { video ->
-                        Text(text = video.title)
-                    }
-                    if (state.videos.isEmpty() && state.audios.isEmpty()) {
-                        item { Text("No local media found") }
+                    if(isVideo){
+                        item {
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                        }
+                        items(state.videos) { video ->
+                            Text(text = video.title)
+                        }
+                        if(state.videos.isEmpty()){
+                            item { Text("No video found") }
+                        }
+                    } else{
+                        item {
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                        }
+                        items(state.audios) { video ->
+                            Text(text = video.title)
+                        }
+                        if(state.audios.isEmpty()){
+                            item { Text("No audio found") }
+                        }
                     }
                 }
             }
