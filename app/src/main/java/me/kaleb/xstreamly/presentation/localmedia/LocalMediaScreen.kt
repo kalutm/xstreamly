@@ -1,7 +1,6 @@
 package me.kaleb.xstreamly.presentation.localmedia
 
 import android.Manifest
-import android.annotation.SuppressLint
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -27,12 +26,27 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import java.time.format.TextStyle
+import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import android.content.ContentUris
+import androidx.core.net.toUri
+import me.kaleb.xstreamly.R
+import me.kaleb.xstreamly.domain.model.LocalAudio
+
+private const val PERMISSION_READ_MEDIA_VIDEO = "android.permission.READ_MEDIA_VIDEO"
+private const val PERMISSION_READ_MEDIA_AUDIO = "android.permission.READ_MEDIA_AUDIO"
 
 @Composable
 fun LocalMediaScreen(
@@ -51,8 +65,8 @@ fun LocalMediaScreen(
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { result: Map<String, Boolean> ->
-        val videoGranted = result[Manifest.permission.READ_MEDIA_VIDEO] == true
-        val audioGranted = result[Manifest.permission.READ_MEDIA_AUDIO] == true
+        val videoGranted = result[PERMISSION_READ_MEDIA_VIDEO] == true
+        val audioGranted = result[PERMISSION_READ_MEDIA_AUDIO] == true
         val storageGranted = result[Manifest.permission.READ_EXTERNAL_STORAGE] == true
 
         hasPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -76,9 +90,9 @@ fun LocalMediaScreen(
 
                 val shouldShowExplanation = (context as? android.app.Activity)?.let { activity ->
                     // Check if we should explain for VIDEO permission
-                    ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.READ_MEDIA_VIDEO) ||
+                    ActivityCompat.shouldShowRequestPermissionRationale(activity, PERMISSION_READ_MEDIA_VIDEO) ||
                             // OR check if we should explain for AUDIO permission
-                            ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.READ_MEDIA_AUDIO)
+                            ActivityCompat.shouldShowRequestPermissionRationale(activity, PERMISSION_READ_MEDIA_AUDIO)
                 } ?: false
 
                 shouldShowExplanation
@@ -111,8 +125,8 @@ fun LocalMediaScreen(
     fun getRequiredPermissions(): Array<String> {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             arrayOf(
-                Manifest.permission.READ_MEDIA_VIDEO,
-                Manifest.permission.READ_MEDIA_AUDIO
+                PERMISSION_READ_MEDIA_VIDEO,
+                PERMISSION_READ_MEDIA_AUDIO
             )
         } else {
             arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
@@ -156,32 +170,75 @@ fun LocalMediaScreen(
                 ) { selected ->
                     isVideo = if (selected == "Video") true else false
                 }
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    if(isVideo){
-                        item {
-                            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                if(isVideo){
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                        LazyVerticalGrid(
+                            columns = GridCells.Adaptive(minSize = 160.dp),
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            gridItems(state.videos, key = { it.id }) { video ->
+                                Card {
+                                    Column {
+                                        VideoThumbnail(
+                                            videoUri = video.uri,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .aspectRatio(16f/9f)     // Good for video thumbnails
+                                        )
+                                        Text(
+                                            text = video.title,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.padding(8.dp)
+                                        )
+                                    }
+                                }
+                            }
                         }
-                        items(state.videos) { video ->
-                            Text(text = video.title)
-                        }
-                        if(state.videos.isEmpty()){
-                            item { Text("No video found") }
-                        }
-                    } else{
-                        item {
-                            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                        }
-                        items(state.audios) { video ->
-                            Text(text = video.title)
-                        }
-                        if(state.audios.isEmpty()){
-                            item { Text("No audio found") }
+                    if(state.videos.isEmpty()){
+                        Text("No video found")
+                    }
+                } else{
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                    LazyColumn() {
+                        items(state.audios) { audio ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                AudioThumbnail(
+                                    audio = audio,
+                                    modifier = Modifier
+                                        .size(56.dp)
+                                        .clip(RoundedCornerShape(4.dp))
+                                )
+
+                                Spacer(modifier = Modifier.width(12.dp))
+
+                                Column {
+                                    Text(text = audio.title, style = MaterialTheme.typography.bodyLarge)
+                                    Text(
+                                        text = audio.artist ?: "Unknown Artist",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
                         }
                     }
+                    if(state.audios.isEmpty()){
+                        Text("No audio found")
+                    }
+
                 }
+
             }
 
             // Case 2: Show rationale (user denied once, but we can still ask)
@@ -305,9 +362,6 @@ fun SlidingSwitch(
 ) {
     val transition = updateTransition(targetState = selectedOption, label = "SwitchTransition")
 
-    // Determine which index is selected to calculate the offset
-    val selectedIndex = options.indexOf(selectedOption)
-
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
@@ -321,13 +375,15 @@ fun SlidingSwitch(
         val tabWidth = maxWidth / options.size
 
         // The Animated Sliding Background
-        val indicatorOffset by transition.animateDp(label = "Offset") { _ ->
-            tabWidth * selectedIndex
+        val indicatorOffset by transition.animateDp(label = "Offset") { selected ->
+            tabWidth * options.indexOf(selected)
         }
 
         Box(
             modifier = Modifier
-                .offset(x = indicatorOffset)
+                .offset {
+                    IntOffset(x = indicatorOffset.roundToPx(), y = 0)
+                }
                 .width(tabWidth)
                 .fillMaxHeight()
                 .clip(RoundedCornerShape(10.dp))
@@ -357,9 +413,55 @@ fun SlidingSwitch(
                 ) {
                     Text(
                         text = option,
+                        color = textColor
                     )
                 }
             }
         }
     }
+}
+
+@Composable
+fun VideoThumbnail(
+    videoUri: Uri,
+    modifier: Modifier = Modifier,
+    contentDescription: String? = null
+) {
+    val context = LocalContext.current
+
+    val imageRequest = ImageRequest.Builder(context)
+        .data(videoUri)
+        .build()
+
+    AsyncImage(
+        model = imageRequest,
+        contentDescription = contentDescription ?: "Video thumbnail",
+        modifier = modifier,
+        contentScale = ContentScale.Crop,
+        placeholder = painterResource(R.drawable.ic_launcher_foreground),
+        error = painterResource(R.drawable.ic_launcher_foreground)
+    )
+}
+
+@Composable
+fun AudioThumbnail(
+    audio: LocalAudio,
+    modifier: Modifier = Modifier
+) {
+    // Album art URI
+    val albumArtUri = audio.albumId?.let { albumId ->
+        ContentUris.withAppendedId(
+            "content://media/external/audio/albumart".toUri(),
+            albumId
+        )
+    }
+
+    AsyncImage(
+        model = albumArtUri ?: R.drawable.ic_launcher_foreground,   // fallback
+        contentDescription = "Album art for ${audio.title}",
+        modifier = modifier,
+        contentScale = ContentScale.Crop,
+        placeholder = painterResource(R.drawable.ic_launcher_foreground),
+        error = painterResource(R.drawable.ic_launcher_foreground)
+    )
 }

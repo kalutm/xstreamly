@@ -7,5 +7,6 @@ data class LocalAudio(
     val title: String,
     val artist: String?,
     val duration: Long,
-    val uri: Uri
+    val uri: Uri,
+    val albumId: Long? = null
 )

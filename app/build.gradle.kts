@@ -53,6 +53,11 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.compose.foundation)
+    implementation("io.coil-kt.coil3:coil-compose:3.0.0")           // Main Coil for Compose
+    implementation("io.coil-kt.coil3:coil-video:3.0.0")             // Important for video thumbnails
+// Optional but recommended for better performance
+    implementation("io.coil-kt.coil3:coil-network-okhttp:3.0.0")
+    implementation(libs.volley)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
